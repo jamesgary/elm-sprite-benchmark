@@ -4,6 +4,8 @@ import Browser
 import Browser.Events
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events
+import Random
 
 
 main : Program Flags Model Msg
@@ -17,11 +19,13 @@ main =
 
 
 type alias Flags =
-    {}
+    { timestamp : Float
+    }
 
 
 type alias Model =
     { sprites : List Sprite
+    , seed : Random.Seed
     }
 
 
@@ -36,18 +40,22 @@ type alias Sprite =
 
 type Msg
     = Tick Float
+    | AddSprites Int
 
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( { sprites =
-            [ { x = 0.5
-              , y = 0.5
-              , xVel = 0.3
-              , yVel = -0.4
-              , bounceSpeed = 3
-              }
-            ]
+    let
+        seed =
+            Random.initialSeed (round flags.timestamp)
+
+        ( newSprites, newSeed ) =
+            Random.step
+                (Random.list 3 spriteGenerator)
+                seed
+    in
+    ( { sprites = newSprites
+      , seed = newSeed
       }
     , Cmd.none
     )
@@ -105,6 +113,36 @@ update msg model =
             , Cmd.none
             )
 
+        AddSprites num ->
+            let
+                ( newSprites, newSeed ) =
+                    Random.step
+                        (Random.list num spriteGenerator)
+                        model.seed
+            in
+            ( { model
+                | sprites = newSprites ++ model.sprites
+                , seed = newSeed
+              }
+            , Cmd.none
+            )
+
+
+spriteGenerator : Random.Generator Sprite
+spriteGenerator =
+    Random.map3
+        (\x xVel bounceSpeed ->
+            { x = 0
+            , y = 0
+            , xVel = xVel
+            , yVel = bounceSpeed
+            , bounceSpeed = bounceSpeed
+            }
+        )
+        (Random.float 0 1)
+        (Random.float -2 2)
+        (Random.float 1 4)
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -121,26 +159,41 @@ view model =
             200
     in
     Html.div
-        [ Html.Attributes.style "width" (px width)
-        , Html.Attributes.style "height" (px height)
-        , Html.Attributes.style "padding-right" (px 10)
-        , Html.Attributes.style "border" "1px solid black"
-        , Html.Attributes.style "position" "relative"
-        ]
-        (model.sprites
-            |> List.map
-                (\sprite ->
-                    Html.div
-                        [ Html.Attributes.style "background" "orange"
-                        , Html.Attributes.style "width" "10px"
-                        , Html.Attributes.style "height" "10px"
-                        , Html.Attributes.style "position" "absolute"
-                        , Html.Attributes.style "left" (width * sprite.x |> px)
-                        , Html.Attributes.style "bottom" (width * sprite.y |> px)
-                        ]
-                        []
+        []
+        [ Html.div
+            [ Html.Attributes.style "width" (px width)
+            , Html.Attributes.style "height" (px height)
+            , Html.Attributes.style "padding-right" (px 10)
+            , Html.Attributes.style "border" "1px solid black"
+            , Html.Attributes.style "position" "relative"
+            ]
+            (model.sprites
+                |> List.map
+                    (\sprite ->
+                        Html.div
+                            [ Html.Attributes.style "background" "orange"
+                            , Html.Attributes.style "width" "10px"
+                            , Html.Attributes.style "height" "10px"
+                            , Html.Attributes.style "position" "absolute"
+                            , Html.Attributes.style "border" "1px solid #a50"
+                            , Html.Attributes.style "left" (width * sprite.x |> px)
+                            , Html.Attributes.style "bottom" (width * sprite.y |> px)
+                            ]
+                            []
+                    )
+            )
+        , Html.div []
+            (List.map
+                (\num ->
+                    Html.button
+                        [ Html.Events.onClick (AddSprites num) ]
+                        [ Html.text ("Add " ++ String.fromInt num ++ " sprites") ]
                 )
-        )
+                [ 10, 100, 1000 ]
+            )
+        , Html.div []
+            [ Html.text ("Total sprites: " ++ String.fromInt (List.length model.sprites)) ]
+        ]
 
 
 px : Float -> String

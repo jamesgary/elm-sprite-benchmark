@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GOTTA GO FAST</title>
+  </head>
+  <body>
+    <div id="elm"></div>
+
+    <script src="./js/main.js"></script>
+    <script>
+        var app = Elm.Main.init({
+          node: document.getElementById('elm'),
+          flags: {
+            timestamp: Date.now(),
+          }
+        });
+
+        //(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
+    </script>
+  </body>
+</html>
