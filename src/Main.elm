@@ -45,8 +45,8 @@ type Msg
 
 
 type Renderer
-    = HtmlTopLeft
-    | HtmlTransformTranslate
+    = HtmlTopLeft -- 1000
+    | HtmlTransformTranslate -- 900
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -77,7 +77,7 @@ update msg model =
                     msDelta / 1000
 
                 gravity =
-                    10
+                    5
 
                 smidge =
                     min (List.length model.sprites - 1) (0.01 * toFloat (List.length model.sprites) |> ceiling)
@@ -129,6 +129,7 @@ update msg model =
                                     , yVel = yVel - (gravity * delta)
                                 }
                             )
+                , seed = newSeed
               }
             , Cmd.none
             )
@@ -154,7 +155,7 @@ spriteGenerator =
         )
         (Random.float 0 1)
         (Random.float -2 2)
-        (Random.float 1 4)
+        (Random.float 1 2.8)
 
 
 subscriptions : Model -> Sub Msg
@@ -168,26 +169,29 @@ view : Model -> Html Msg
 view model =
     let
         width =
-            200
+            600
 
         height =
-            200
+            400
+
+        spriteSize =
+            32
     in
     Html.div
         []
         [ Html.div
             [ Html.Attributes.style "width" (px width)
             , Html.Attributes.style "height" (px height)
-            , Html.Attributes.style "padding-right" (px 10)
+            , Html.Attributes.style "padding-right" (px spriteSize)
             , Html.Attributes.style "border" "1px solid black"
             , Html.Attributes.style "position" "relative"
             ]
             (case model.renderer of
                 HtmlTopLeft ->
-                    viewHtmlTopLeft width height model.sprites
+                    viewHtmlTopLeft width height spriteSize model.sprites
 
                 HtmlTransformTranslate ->
-                    viewHtmlTransformTranslate width height model.sprites
+                    viewHtmlTransformTranslate width height spriteSize model.sprites
             )
         , Html.div []
             (List.map
@@ -205,42 +209,40 @@ view model =
         ]
 
 
-viewHtmlTopLeft : Float -> Float -> List Sprite -> List (Html Msg)
-viewHtmlTopLeft width height sprites =
+viewHtmlTopLeft : Float -> Float -> Float -> List Sprite -> List (Html Msg)
+viewHtmlTopLeft width height spriteSize sprites =
     -- around 800
     sprites
         |> List.map
             (\sprite ->
-                Html.div
-                    [ Html.Attributes.style "background" "orange"
-                    , Html.Attributes.style "width" "10px"
-                    , Html.Attributes.style "height" "10px"
+                Html.img
+                    [ Html.Attributes.src "cat.png"
+                    , Html.Attributes.style "width" (px spriteSize)
+                    , Html.Attributes.style "height" (px spriteSize)
                     , Html.Attributes.style "position" "absolute"
-                    , Html.Attributes.style "border" "1px solid #a50"
                     , Html.Attributes.style "left" (width * sprite.x |> px)
-                    , Html.Attributes.style "bottom" (width * sprite.y |> px)
+                    , Html.Attributes.style "bottom" (height * sprite.y |> px)
                     ]
                     []
             )
 
 
-viewHtmlTransformTranslate : Float -> Float -> List Sprite -> List (Html Msg)
-viewHtmlTransformTranslate width height sprites =
+viewHtmlTransformTranslate : Float -> Float -> Float -> List Sprite -> List (Html Msg)
+viewHtmlTransformTranslate width height spriteSize sprites =
     -- around 700
     sprites
         |> List.map
             (\sprite ->
-                Html.div
-                    [ Html.Attributes.style "background" "orange"
-                    , Html.Attributes.style "width" "10px"
-                    , Html.Attributes.style "height" "10px"
-                    , Html.Attributes.style "border" "1px solid #a50"
+                Html.img
+                    [ Html.Attributes.src "cat.png"
+                    , Html.Attributes.style "width" (px spriteSize)
+                    , Html.Attributes.style "height" (px spriteSize)
                     , Html.Attributes.style "position" "absolute"
                     , Html.Attributes.style "transform"
                         ("translate("
                             ++ (width * sprite.x |> px)
                             ++ ","
-                            ++ (height - 10 + (height * -sprite.y) |> px)
+                            ++ (height - spriteSize + (height * -sprite.y) |> px)
                         )
                     ]
                     []
