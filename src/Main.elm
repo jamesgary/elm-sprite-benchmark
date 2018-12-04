@@ -6,7 +6,6 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Random
-import Time exposing (Posix)
 
 
 main : Program Flags Model Msg
@@ -27,11 +26,6 @@ type alias Flags =
 type alias Model =
     { sprites : List Sprite
     , seed : Random.Seed
-    , fpsData :
-        { frames : List Float
-        , chunkSize : Float
-        , dataToShow : List Float
-        }
     }
 
 
@@ -46,7 +40,6 @@ type alias Sprite =
 
 type Msg
     = Tick Float
-    | TickPosix Posix
     | AddSprites Int
 
 
@@ -58,16 +51,11 @@ init flags =
 
         ( newSprites, newSeed ) =
             Random.step
-                (Random.list 3 spriteGenerator)
+                (Random.list 100 spriteGenerator)
                 seed
     in
     ( { sprites = newSprites
       , seed = newSeed
-      , fpsData =
-            { frames = []
-            , chunkSize = 1
-            , dataToShow = []
-            }
       }
     , Cmd.none
     )
@@ -83,10 +71,23 @@ update msg model =
 
                 gravity =
                     10
+
+                smidge =
+                    min (List.length model.sprites - 1) (0.01 * toFloat (List.length model.sprites) |> ceiling)
+
+                ( newSprites, newSeed ) =
+                    if delta < (1 / 55) then
+                        Random.step
+                            (Random.list smidge spriteGenerator)
+                            model.seed
+                            |> (\( generatedSprites, s ) -> ( generatedSprites ++ model.sprites, s ))
+
+                    else
+                        ( List.drop smidge model.sprites, model.seed )
             in
             ( { model
                 | sprites =
-                    model.sprites
+                    newSprites
                         |> List.map
                             (\sprite ->
                                 let
@@ -139,47 +140,6 @@ update msg model =
             , Cmd.none
             )
 
-        TickPosix posix ->
-            let
-                fpsData =
-                    model.fpsData
-
-                frame =
-                    (Time.posixToMillis posix
-                        |> toFloat
-                    )
-                        / 1000
-
-                ( frames, dataToShow ) =
-                    case List.head fpsData.frames of
-                        Nothing ->
-                            ( [ frame ], fpsData.dataToShow )
-
-                        Just startTime ->
-                            if frame - startTime > fpsData.chunkSize then
-                                ( [ frame ]
-                                , fpsData.frames
-                                    --|> List.sum
-                                    --|> (\sum -> sum / (toFloat <| List.length fpsData.frames))
-                                    --|> (\avg -> avg :: fpsData.dataToShow)
-                                    |> List.length
-                                    |> toFloat
-                                    |> (\avg -> avg :: fpsData.dataToShow)
-                                )
-
-                            else
-                                ( fpsData.frames ++ [ frame ], fpsData.dataToShow )
-            in
-            ( { model
-                | fpsData =
-                    { fpsData
-                        | frames = frames
-                        , dataToShow = dataToShow
-                    }
-              }
-            , Cmd.none
-            )
-
 
 spriteGenerator : Random.Generator Sprite
 spriteGenerator =
@@ -201,7 +161,6 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Browser.Events.onAnimationFrameDelta Tick
-        , Browser.Events.onAnimationFrame TickPosix
         ]
 
 
@@ -249,17 +208,6 @@ view model =
             )
         , Html.div []
             [ Html.text ("Total sprites: " ++ String.fromInt (List.length model.sprites)) ]
-        , Html.div []
-            (model.fpsData.dataToShow
-                |> List.reverse
-                |> List.indexedMap
-                    (\i avg ->
-                        [ Html.div []
-                            [ Html.text (String.fromInt i ++ ": " ++ String.fromFloat avg) ]
-                        ]
-                    )
-                |> List.concat
-            )
         ]
 
 
