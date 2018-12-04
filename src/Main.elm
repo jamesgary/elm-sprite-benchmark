@@ -26,6 +26,7 @@ type alias Flags =
 type alias Model =
     { sprites : List Sprite
     , seed : Random.Seed
+    , renderer : Renderer
     }
 
 
@@ -40,7 +41,12 @@ type alias Sprite =
 
 type Msg
     = Tick Float
-    | AddSprites Int
+    | ChangeRenderer Renderer
+
+
+type Renderer
+    = HtmlTopLeft
+    | HtmlTransformTranslate
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -56,6 +62,7 @@ init flags =
     in
     ( { sprites = newSprites
       , seed = newSeed
+      , renderer = HtmlTopLeft
       }
     , Cmd.none
     )
@@ -126,16 +133,9 @@ update msg model =
             , Cmd.none
             )
 
-        AddSprites num ->
-            let
-                ( newSprites, newSeed ) =
-                    Random.step
-                        (Random.list num spriteGenerator)
-                        model.seed
-            in
+        ChangeRenderer renderer ->
             ( { model
-                | sprites = newSprites ++ model.sprites
-                , seed = newSeed
+                | renderer = renderer
               }
             , Cmd.none
             )
@@ -182,33 +182,69 @@ view model =
             , Html.Attributes.style "border" "1px solid black"
             , Html.Attributes.style "position" "relative"
             ]
-            (model.sprites
-                |> List.map
-                    (\sprite ->
-                        Html.div
-                            [ Html.Attributes.style "background" "orange"
-                            , Html.Attributes.style "width" "10px"
-                            , Html.Attributes.style "height" "10px"
-                            , Html.Attributes.style "position" "absolute"
-                            , Html.Attributes.style "border" "1px solid #a50"
-                            , Html.Attributes.style "left" (width * sprite.x |> px)
-                            , Html.Attributes.style "bottom" (width * sprite.y |> px)
-                            ]
-                            []
-                    )
+            (case model.renderer of
+                HtmlTopLeft ->
+                    viewHtmlTopLeft width height model.sprites
+
+                HtmlTransformTranslate ->
+                    viewHtmlTransformTranslate width height model.sprites
             )
         , Html.div []
             (List.map
-                (\num ->
+                (\( renderer, str ) ->
                     Html.button
-                        [ Html.Events.onClick (AddSprites num) ]
-                        [ Html.text ("Add " ++ String.fromInt num ++ " sprites") ]
+                        [ Html.Events.onClick (ChangeRenderer renderer) ]
+                        [ Html.text str ]
                 )
-                [ 10, 100, 1000 ]
+                [ ( HtmlTopLeft, "HTML: top, left" )
+                , ( HtmlTransformTranslate, "HTML: transform" )
+                ]
             )
         , Html.div []
             [ Html.text ("Total sprites: " ++ String.fromInt (List.length model.sprites)) ]
         ]
+
+
+viewHtmlTopLeft : Float -> Float -> List Sprite -> List (Html Msg)
+viewHtmlTopLeft width height sprites =
+    -- around 800
+    sprites
+        |> List.map
+            (\sprite ->
+                Html.div
+                    [ Html.Attributes.style "background" "orange"
+                    , Html.Attributes.style "width" "10px"
+                    , Html.Attributes.style "height" "10px"
+                    , Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "border" "1px solid #a50"
+                    , Html.Attributes.style "left" (width * sprite.x |> px)
+                    , Html.Attributes.style "bottom" (width * sprite.y |> px)
+                    ]
+                    []
+            )
+
+
+viewHtmlTransformTranslate : Float -> Float -> List Sprite -> List (Html Msg)
+viewHtmlTransformTranslate width height sprites =
+    -- around 700
+    sprites
+        |> List.map
+            (\sprite ->
+                Html.div
+                    [ Html.Attributes.style "background" "orange"
+                    , Html.Attributes.style "width" "10px"
+                    , Html.Attributes.style "height" "10px"
+                    , Html.Attributes.style "border" "1px solid #a50"
+                    , Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "transform"
+                        ("translate("
+                            ++ (width * sprite.x |> px)
+                            ++ ","
+                            ++ (height - 10 + (height * -sprite.y) |> px)
+                        )
+                    ]
+                    []
+            )
 
 
 px : Float -> String
