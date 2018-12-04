@@ -2,9 +2,15 @@
 <html>
   <head>
     <title>GOTTA GO FAST</title>
+    <style>
+      #stats div {
+        left: 250px !important;
+      }
+    </style>
   </head>
   <body>
     <div id="elm"></div>
+    <div id="stats"></div>
 
     <script src="./js/main.js"></script>
     <script>
@@ -15,7 +21,7 @@
           }
         });
 
-        //(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
+        (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
     </script>
   </body>
 </html>
