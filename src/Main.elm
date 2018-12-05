@@ -304,15 +304,20 @@ viewZinggi resources width height spriteSize sprites =
 
 viewDataAttrs : Float -> Float -> Float -> List Sprite -> List (Html Msg)
 viewDataAttrs width height spriteSize sprites =
-    sprites
-        |> List.map
-            (\sprite ->
-                Html.div
-                    [ Html.Attributes.attribute "x" (String.fromFloat sprite.x)
-                    , Html.Attributes.attribute "y" (String.fromFloat sprite.y)
-                    ]
-                    []
+    [ Html.div
+        [ Html.Attributes.attribute "data-sprites"
+            (sprites
+                |> List.map
+                    (\sprite ->
+                        "{\"x\":" ++ String.fromFloat sprite.x ++ ",\"y\":" ++ String.fromFloat sprite.y ++ "}"
+                    )
+                |> String.join ","
+                |> (\str -> "[" ++ str ++ "]")
             )
+        , Html.Attributes.id "sprite-data"
+        ]
+        []
+    ]
 
 
 px : Float -> String

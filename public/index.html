@@ -10,16 +10,93 @@
   </head>
   <body>
     <div id="elm"></div>
+    <div id="pixi" style="position: absolute; top: 5px; right: 5px"></div>
     <div id="stats"></div>
 
+    <script src="./js/pixi.min.js"></script>
+    <script src="./js/pixi-particles.js"></script>
     <script src="./js/main.js"></script>
     <script>
-        var app = Elm.Main.init({
+        let app = Elm.Main.init({
           node: document.getElementById('elm'),
           flags: {
             timestamp: Date.now(),
           }
         });
+
+        // pixi stuff
+
+        let spritesContainer;
+        let spritePool = [];
+        let pixiInit = function() {
+          var app = new PIXI.Application({
+            width: 600,
+            height: 400,
+          });
+          document.getElementById('pixi').appendChild(app.view);
+
+          spritesContainer = new PIXI.particles.ParticleContainer(10000, {
+            //scale: true,
+            position: true,
+            //rotation: true,
+            //uvs: true,
+            alpha: true
+          });
+          app.stage.addChild(spritesContainer);
+        }
+
+        let createSprite = function() {
+          var sprite = PIXI.Sprite.fromImage('cat.png');
+          sprite.anchor.set(0.5);
+
+          return sprite;
+        }
+
+        let getSpriteInfo = function() {
+          let div =  document.getElementById("sprite-data");
+          if (div) {
+            return JSON.parse(div.dataset.sprites);
+          } else {
+            return [];
+          }
+        }
+
+        let pixiUpdate = function() {
+          let sprites = getSpriteInfo();
+          //console.log(sprites.length);
+
+          let sm = 0;
+          // make/reuse sprites and animate
+          for (let i = 0; i < sprites.length; i++) {
+            let spriteData = sprites[i];
+            let sprite;
+            if (i < spritePool.length) {
+              sprite = spritePool[i];
+              spritePool[i].alpha = 1;
+            } else {
+              sprite = createSprite();
+              spritesContainer.addChild(sprite);
+              spritePool.push(sprite);
+            }
+            sprite.x = spriteData.x * 600;
+            sprite.y = 400 - spriteData.y * 400;
+          }
+          console.log(sm);
+
+          // destroy unused sprites
+          if (spritePool.length > sprites.length) {
+            for (let i = sprites.length; i < spritePool.length; i++) {
+              spritePool[i].alpha = 0;
+              //spritePool[i].destroy();
+            }
+            spritePool.splice(sprites.length, spritePool.length - sprites.length);
+          }
+
+          requestAnimationFrame(pixiUpdate);
+        }
+
+        pixiInit();
+        requestAnimationFrame(pixiUpdate);
 
         (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
     </script>
