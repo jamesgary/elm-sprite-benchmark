@@ -2,6 +2,10 @@ module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
 import Browser
 import Browser.Events
+import Game.Resources
+import Game.TwoD
+import Game.TwoD.Camera
+import Game.TwoD.Render
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
@@ -27,7 +31,18 @@ type alias Model =
     { sprites : List Sprite
     , seed : Random.Seed
     , renderer : Renderer
+
+    -- Zinggi's Game 2D library
+    , resources : Game.Resources.Resources
     }
+
+
+type Renderer
+    = HtmlTopLeft -- 1000
+    | HtmlTransformTranslate -- 900
+    | None -- 30,000
+    | Zinggi -- 1000
+    | DataAttrs -- 4000
 
 
 type alias Sprite =
@@ -42,11 +57,7 @@ type alias Sprite =
 type Msg
     = Tick Float
     | ChangeRenderer Renderer
-
-
-type Renderer
-    = HtmlTopLeft -- 1000
-    | HtmlTransformTranslate -- 900
+    | Resources Game.Resources.Msg
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -63,8 +74,10 @@ init flags =
     ( { sprites = newSprites
       , seed = newSeed
       , renderer = HtmlTopLeft
+      , resources = Game.Resources.init
       }
-    , Cmd.none
+    , Game.Resources.loadTextures [ "cat.png" ]
+        |> Cmd.map Resources
     )
 
 
@@ -122,11 +135,11 @@ update msg model =
                                         else
                                             ( sprite.y + yTravelDist, sprite.yVel )
                                 in
-                                { sprite
-                                    | x = x
-                                    , y = y
-                                    , xVel = xVel
-                                    , yVel = yVel - (gravity * delta)
+                                { x = x |> max 0 |> min 1
+                                , y = y |> max 0 |> min 1
+                                , xVel = xVel
+                                , yVel = yVel - (gravity * delta)
+                                , bounceSpeed = sprite.bounceSpeed
                                 }
                             )
                 , seed = newSeed
@@ -137,6 +150,14 @@ update msg model =
         ChangeRenderer renderer ->
             ( { model
                 | renderer = renderer
+              }
+            , Cmd.none
+            )
+
+        Resources resourcesMsg ->
+            ( { model
+                | resources =
+                    Game.Resources.update resourcesMsg model.resources
               }
             , Cmd.none
             )
@@ -192,6 +213,15 @@ view model =
 
                 HtmlTransformTranslate ->
                     viewHtmlTransformTranslate width height spriteSize model.sprites
+
+                None ->
+                    []
+
+                Zinggi ->
+                    viewZinggi model.resources width height spriteSize model.sprites
+
+                DataAttrs ->
+                    viewDataAttrs width height spriteSize model.sprites
             )
         , Html.div []
             (List.map
@@ -202,6 +232,9 @@ view model =
                 )
                 [ ( HtmlTopLeft, "HTML: top, left" )
                 , ( HtmlTransformTranslate, "HTML: transform" )
+                , ( Zinggi, "Zinggi Game.TwoD" )
+                , ( DataAttrs, "Just data attrs" )
+                , ( None, "None" )
                 ]
             )
         , Html.div []
@@ -244,6 +277,39 @@ viewHtmlTransformTranslate width height spriteSize sprites =
                             ++ ","
                             ++ (height - spriteSize + (height * -sprite.y) |> px)
                         )
+                    ]
+                    []
+            )
+
+
+viewZinggi : Game.Resources.Resources -> Float -> Float -> Float -> List Sprite -> List (Html Msg)
+viewZinggi resources width height spriteSize sprites =
+    [ Game.TwoD.render
+        { time = 0
+        , size = ( round width, round height )
+        , camera = Game.TwoD.Camera.fixedArea (width * height) ( 0.5 * width, 0.5 * height )
+        }
+        (sprites
+            |> List.map
+                (\sprite ->
+                    Game.TwoD.Render.sprite
+                        { texture = Game.Resources.getTexture "cat.png" resources
+                        , position = ( sprite.x * width, sprite.y * height )
+                        , size = ( spriteSize, spriteSize )
+                        }
+                )
+        )
+    ]
+
+
+viewDataAttrs : Float -> Float -> Float -> List Sprite -> List (Html Msg)
+viewDataAttrs width height spriteSize sprites =
+    sprites
+        |> List.map
+            (\sprite ->
+                Html.div
+                    [ Html.Attributes.attribute "x" (String.fromFloat sprite.x)
+                    , Html.Attributes.attribute "y" (String.fromFloat sprite.y)
                     ]
                     []
             )
