@@ -63,6 +63,15 @@
 
         let pixiUpdate = function() {
           let sprites = getSpriteInfo();
+
+          if (sprites.length > 0) {
+            drawSprites(sprites);
+          }
+
+          requestAnimationFrame(pixiUpdate);
+        }
+
+        let drawSprites = function(sprites) {
           //console.log(sprites.length);
 
           let sm = 0;
@@ -92,12 +101,14 @@
             }
             //spritePool.splice(sprites.length, spritePool.length - sprites.length);
           }
-
-          requestAnimationFrame(pixiUpdate);
         }
 
         pixiInit();
         requestAnimationFrame(pixiUpdate);
+
+        app.ports.sendSprites.subscribe(function(sprites) {
+          drawSprites(sprites);
+        });
 
         (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
     </script>

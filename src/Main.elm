@@ -1,4 +1,4 @@
-module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
+port module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
 import Browser
 import Browser.Events
@@ -11,6 +11,9 @@ import Html.Attributes
 import Html.Events
 import Json.Encode
 import Random
+
+
+port sendSprites : Json.Encode.Value -> Cmd msg
 
 
 main : Program Flags Model Msg
@@ -44,7 +47,8 @@ type Renderer
     | None -- 30,000
     | Zinggi -- 1000
     | DataAttrs -- 8000
-    | PixiJsDataAttrs -- 5000
+    | PixiJsDataAttrs -- 6000
+    | PixiJsPorts -- 14,000
 
 
 type alias Sprite =
@@ -146,7 +150,12 @@ update msg model =
                             )
                 , seed = newSeed
               }
-            , Cmd.none
+            , case model.renderer of
+                PixiJsPorts ->
+                    sendSprites (encodeSprites model.sprites)
+
+                _ ->
+                    Cmd.none
             )
 
         ChangeRenderer renderer ->
@@ -227,6 +236,9 @@ view model =
 
                 PixiJsDataAttrs ->
                     viewPixiJsDataAttrs width height spriteSize model.sprites
+
+                PixiJsPorts ->
+                    []
             )
         , Html.div []
             (List.map
@@ -240,6 +252,7 @@ view model =
                 , ( Zinggi, "Zinggi Game.TwoD" )
                 , ( DataAttrs, "Just data attrs" )
                 , ( PixiJsDataAttrs, "PixiJS with data attrs" )
+                , ( PixiJsPorts, "PixiJS ports" )
                 , ( None, "None" )
                 ]
             )
