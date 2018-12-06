@@ -53,7 +53,7 @@
         }
 
         let getSpriteInfo = function() {
-          let div =  document.getElementById("sprite-data");
+          let div =  document.getElementById("sprite-data-for-pixijs");
           if (div) {
             return JSON.parse(div.dataset.sprites);
           } else {
@@ -81,15 +81,16 @@
             sprite.x = spriteData.x * 600;
             sprite.y = 400 - spriteData.y * 400;
           }
-          console.log(sm);
+          //console.log(sm);
 
           // destroy unused sprites
           if (spritePool.length > sprites.length) {
             for (let i = sprites.length; i < spritePool.length; i++) {
-              spritePool[i].alpha = 0;
+              //spritePool[i].alpha = 0;
               //spritePool[i].destroy();
+              spritePool[i].alpha = 0;
             }
-            spritePool.splice(sprites.length, spritePool.length - sprites.length);
+            //spritePool.splice(sprites.length, spritePool.length - sprites.length);
           }
 
           requestAnimationFrame(pixiUpdate);

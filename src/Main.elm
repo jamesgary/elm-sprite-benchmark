@@ -9,6 +9,7 @@ import Game.TwoD.Render
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
+import Json.Encode
 import Random
 
 
@@ -42,7 +43,8 @@ type Renderer
     | HtmlTransformTranslate -- 900
     | None -- 30,000
     | Zinggi -- 1000
-    | DataAttrs -- 4000
+    | DataAttrs -- 8000
+    | PixiJsDataAttrs -- 5000
 
 
 type alias Sprite =
@@ -222,6 +224,9 @@ view model =
 
                 DataAttrs ->
                     viewDataAttrs width height spriteSize model.sprites
+
+                PixiJsDataAttrs ->
+                    viewPixiJsDataAttrs width height spriteSize model.sprites
             )
         , Html.div []
             (List.map
@@ -234,6 +239,7 @@ view model =
                 , ( HtmlTransformTranslate, "HTML: transform" )
                 , ( Zinggi, "Zinggi Game.TwoD" )
                 , ( DataAttrs, "Just data attrs" )
+                , ( PixiJsDataAttrs, "PixiJS with data attrs" )
                 , ( None, "None" )
                 ]
             )
@@ -305,19 +311,53 @@ viewZinggi resources width height spriteSize sprites =
 viewDataAttrs : Float -> Float -> Float -> List Sprite -> List (Html Msg)
 viewDataAttrs width height spriteSize sprites =
     [ Html.div
-        [ Html.Attributes.attribute "data-sprites"
-            (sprites
-                |> List.map
-                    (\sprite ->
-                        "{\"x\":" ++ String.fromFloat sprite.x ++ ",\"y\":" ++ String.fromFloat sprite.y ++ "}"
-                    )
-                |> String.join ","
-                |> (\str -> "[" ++ str ++ "]")
-            )
+        [ Html.Attributes.attribute "data-sprites" (spritesToAttrVal sprites)
         , Html.Attributes.id "sprite-data"
         ]
         []
     ]
+
+
+viewPixiJsDataAttrs : Float -> Float -> Float -> List Sprite -> List (Html Msg)
+viewPixiJsDataAttrs width height spriteSize sprites =
+    [ Html.div
+        [ Html.Attributes.attribute "data-sprites" (spritesToAttrVal sprites)
+        , Html.Attributes.id "sprite-data-for-pixijs"
+        ]
+        []
+    ]
+
+
+spritesToAttrVal : List Sprite -> String
+spritesToAttrVal sprites =
+    if False then
+        encodeSpritesWithString sprites
+
+    else
+        encodeSprites sprites |> Json.Encode.encode 0
+
+
+encodeSprites : List Sprite -> Json.Encode.Value
+encodeSprites sprites =
+    sprites
+        |> Json.Encode.list
+            (\sprite ->
+                Json.Encode.object
+                    [ ( "x", Json.Encode.float sprite.x )
+                    , ( "y", Json.Encode.float sprite.y )
+                    ]
+            )
+
+
+encodeSpritesWithString : List Sprite -> String
+encodeSpritesWithString sprites =
+    sprites
+        |> List.map
+            (\sprite ->
+                "{\"x\":" ++ String.fromFloat sprite.x ++ ",\"y\":" ++ String.fromFloat sprite.y ++ "}"
+            )
+        |> String.join ","
+        |> (\str -> "[" ++ str ++ "]")
 
 
 px : Float -> String
