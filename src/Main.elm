@@ -10,7 +10,10 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Json.Encode
+import Math.Matrix4 as Mat4 exposing (Mat4)
+import Math.Vector3 as Vec3 exposing (Vec3, vec3)
 import Random
+import WebGL exposing (Mesh, Shader)
 
 
 port sendSprites : Json.Encode.Value -> Cmd msg
@@ -49,6 +52,7 @@ type Renderer
     | DataAttrs -- 8000
     | PixiJsDataAttrs -- 6000
     | PixiJsPorts -- 14,000
+    | WebGLRenderer -- ???
 
 
 type alias Sprite =
@@ -79,7 +83,7 @@ init flags =
     in
     ( { sprites = newSprites
       , seed = newSeed
-      , renderer = HtmlTopLeft
+      , renderer = WebGLRenderer --HtmlTopLeft
       , resources = Game.Resources.init
       }
     , Game.Resources.loadTextures [ "cat.png" ]
@@ -102,7 +106,7 @@ update msg model =
                     min (List.length model.sprites - 1) (0.01 * toFloat (List.length model.sprites) |> ceiling)
 
                 ( newSprites, newSeed ) =
-                    if delta < (1 / 55) then
+                    if delta < (1 / 25) then
                         Random.step
                             (Random.list smidge spriteGenerator)
                             model.seed
@@ -239,6 +243,9 @@ view model =
 
                 PixiJsPorts ->
                     []
+
+                WebGLRenderer ->
+                    viewWebGL width height spriteSize model.sprites
             )
         , Html.div []
             (List.map
@@ -254,6 +261,7 @@ view model =
                 , ( PixiJsDataAttrs, "PixiJS with data attrs" )
                 , ( PixiJsPorts, "PixiJS ports" )
                 , ( None, "None" )
+                , ( WebGLRenderer, "WebGL" )
                 ]
             )
         , Html.div []
@@ -371,6 +379,100 @@ encodeSpritesWithString sprites =
             )
         |> String.join ","
         |> (\str -> "[" ++ str ++ "]")
+
+
+hasInit =
+    False
+
+
+viewWebGL : Float -> Float -> Float -> List Sprite -> List (Html Msg)
+viewWebGL width height spriteSize sprites =
+    [ WebGL.toHtml
+        [ Html.Attributes.width 600
+        , Html.Attributes.height 400
+        ]
+        (sprites
+            |> List.map
+                (\{ x, y } ->
+                    WebGL.entity
+                        vertexShader
+                        fragmentShader
+                        cubeMesh
+                        { x = x, y = y }
+                )
+        )
+    ]
+
+
+type alias Uniforms =
+    { x : Float
+    , y : Float
+    }
+
+
+type alias Vertex =
+    { color : Vec3
+    , position : Vec3
+    }
+
+
+vertexShader : Shader Vertex Uniforms { vcolor : Vec3 }
+vertexShader =
+    [glsl|
+        attribute vec3 position;
+        attribute vec3 color;
+        uniform float x;
+        funiform float y;
+        varying vec3 vcolor;
+        void main () {
+            vec3 newPostion = vec3(x - 0.5, y - 0.5, 0) + position;
+            gl_Position = vec4(newPostion, 1.0);
+            vcolor = color;
+        }
+    |]
+
+
+fragmentShader : Shader {} Uniforms { vcolor : Vec3 }
+fragmentShader =
+    [glsl|
+        precision mediump float;
+        varying vec3 vcolor;
+        void main () {
+            gl_FragColor = vec4(vcolor, 1.0);
+        }
+    |]
+
+
+cubeMesh : Mesh Vertex
+cubeMesh =
+    let
+        rft =
+            vec3 0.1 0.1 0
+
+        lft =
+            vec3 -0.1 0.1 0
+
+        lbt =
+            vec3 -0.1 -0.1 0
+
+        rbt =
+            vec3 0.1 -0.1 0
+    in
+    [ face (vec3 237 212 0) rft lft lbt rbt -- yellow
+    ]
+        |> List.concat
+        |> WebGL.triangles
+
+
+face : Vec3 -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> List ( Vertex, Vertex, Vertex )
+face color a b c d =
+    let
+        vertex position =
+            Vertex (Vec3.scale (1 / 255) color) position
+    in
+    [ ( vertex a, vertex b, vertex c )
+    , ( vertex c, vertex d, vertex a )
+    ]
 
 
 px : Float -> String
