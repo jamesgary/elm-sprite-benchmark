@@ -102,18 +102,35 @@ update msg model =
                 gravity =
                     5
 
-                smidge =
-                    min (List.length model.sprites - 1) (0.01 * toFloat (List.length model.sprites) |> ceiling)
+                minTick =
+                    1 / 55
 
                 ( newSprites, newSeed ) =
-                    if delta < (1 / 55) then
-                        Random.step
-                            (Random.list smidge spriteGenerator)
-                            model.seed
-                            |> (\( generatedSprites, s ) -> ( generatedSprites ++ model.sprites, s ))
+                    if delta > minTick then
+                        -- too slow! remove some sprites (down to 1 sprite)
+                        model.sprites
+                            |> List.length
+                            |> toFloat
+                            |> (*) (2 * minTick)
+                            |> ceiling
+                            |> min (List.length model.sprites - 1)
+                            |> (\decreaseAmt ->
+                                    ( List.drop decreaseAmt model.sprites, model.seed )
+                               )
 
                     else
-                        ( List.drop smidge model.sprites, model.seed )
+                        -- so fast, add more sprites!
+                        model.sprites
+                            |> List.length
+                            |> toFloat
+                            |> (*) 0.01
+                            |> round
+                            |> (\increaseAmt ->
+                                    Random.step
+                                        (Random.list increaseAmt spriteGenerator)
+                                        model.seed
+                                        |> (\( generatedSprites, s ) -> ( generatedSprites ++ model.sprites, s ))
+                               )
             in
             ( { model
                 | sprites =
@@ -273,6 +290,7 @@ view model =
                 (\( renderer, str ) ->
                     Html.button
                         [ Html.Attributes.style "font-size" "16px"
+                        , Html.Attributes.style "margin" "2px 0"
                         , if model.renderer == renderer then
                             Html.Attributes.disabled True
 
