@@ -303,21 +303,32 @@ view model =
             )
         , -- buttons
           Html.div
-            [ Html.Attributes.style "margin" "10px"
+            [ Html.Attributes.style "margin" "0 10px"
             , Html.Attributes.style "display" "flex"
             , Html.Attributes.style "flex-direction" "column"
             ]
             (List.map
                 (\( renderer, str ) ->
                     Html.button
-                        [ Html.Attributes.style "font-size" "16px"
-                        , Html.Attributes.style "margin" "2px 0"
-                        , if model.renderer == renderer then
-                            Html.Attributes.disabled True
+                        ([ Html.Attributes.style "font-size" "16px"
+                         , Html.Attributes.style "margin" "0 0 5px"
+                         , Html.Attributes.style "padding" "5px 10px"
+                         , Html.Attributes.style "border-color" "#6cf #7bf #1af"
+                         ]
+                            ++ (if model.renderer == renderer then
+                                    [ Html.Attributes.disabled True
+                                    , Html.Attributes.style "background" "#dff"
+                                    , Html.Attributes.style "color" "black"
+                                    ]
 
-                          else
-                            Html.Events.onClick (ChangeRenderer renderer)
-                        ]
+                                else
+                                    [ Html.Events.onClick (ChangeRenderer renderer)
+                                    , Html.Attributes.style "background" "#adf"
+                                    , Html.Attributes.style "color" "black"
+                                    , Html.Attributes.style "cursor" "pointer"
+                                    ]
+                               )
+                        )
                         [ Html.text str ]
                 )
                 [ ( HtmlTopLeft, "HTML: top, left" )
