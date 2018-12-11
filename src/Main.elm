@@ -83,7 +83,7 @@ init flags =
     in
     ( { sprites = newSprites
       , seed = newSeed
-      , renderer = WebGLRenderer --HtmlTopLeft
+      , renderer = HtmlTransformTranslate -- WebGLRenderer --HtmlTopLeft
       , resources = Game.Resources.init
       }
     , Game.Resources.loadTextures [ "cat.png" ]
@@ -106,7 +106,7 @@ update msg model =
                     min (List.length model.sprites - 1) (0.01 * toFloat (List.length model.sprites) |> ceiling)
 
                 ( newSprites, newSeed ) =
-                    if delta < (1 / 25) then
+                    if delta < (1 / 55) then
                         Random.step
                             (Random.list smidge spriteGenerator)
                             model.seed
@@ -210,33 +210,48 @@ view model =
         height =
             400
 
+        canvasMargin =
+            10
+
         spriteSize =
             32
     in
     Html.div
-        []
-        [ Html.div
+        [ Html.Attributes.style "display" "flex"
+        , Html.Attributes.style "margin" (px canvasMargin)
+        ]
+        [ -- canvases
+          Html.div
             [ Html.Attributes.style "width" (px width)
             , Html.Attributes.style "height" (px height)
-            , Html.Attributes.style "padding-right" (px spriteSize)
+
+            --, Html.Attributes.style "padding-right" (px spriteSize)
             , Html.Attributes.style "border" "1px solid black"
             , Html.Attributes.style "position" "relative"
+
+            --, Html.Attributes.style "background" "rgba(0,255,255,0.1)"
+            , Html.Attributes.style "overflow" "hidden"
             ]
             (case model.renderer of
                 HtmlTopLeft ->
                     viewHtmlTopLeft width height spriteSize model.sprites
+                        |> withWhiteBg
 
                 HtmlTransformTranslate ->
                     viewHtmlTransformTranslate width height spriteSize model.sprites
+                        |> withWhiteBg
 
                 None ->
                     []
+                        |> withWhiteBg
 
                 Zinggi ->
                     viewZinggi model.resources width height spriteSize model.sprites
+                        |> withWhiteBg
 
                 DataAttrs ->
                     viewDataAttrs width height spriteSize model.sprites
+                        |> withWhiteBg
 
                 PixiJsDataAttrs ->
                     viewPixiJsDataAttrs width height spriteSize model.sprites
@@ -246,12 +261,24 @@ view model =
 
                 WebGLRenderer ->
                     viewWebGL width height spriteSize model.sprites
+                        |> withWhiteBg
             )
-        , Html.div []
+        , -- buttons
+          Html.div
+            [ Html.Attributes.style "margin" "10px"
+            , Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "flex-direction" "column"
+            ]
             (List.map
                 (\( renderer, str ) ->
                     Html.button
-                        [ Html.Events.onClick (ChangeRenderer renderer) ]
+                        [ Html.Attributes.style "font-size" "16px"
+                        , if model.renderer == renderer then
+                            Html.Attributes.disabled True
+
+                          else
+                            Html.Events.onClick (ChangeRenderer renderer)
+                        ]
                         [ Html.text str ]
                 )
                 [ ( HtmlTopLeft, "HTML: top, left" )
@@ -264,9 +291,25 @@ view model =
                 , ( WebGLRenderer, "WebGL" )
                 ]
             )
-        , Html.div []
+
+        -- count
+        , Html.div
+            [ Html.Attributes.style "position" "absolute"
+            , Html.Attributes.style "bottom" "0"
+            ]
             [ Html.text ("Total sprites: " ++ String.fromInt (List.length model.sprites)) ]
         ]
+
+
+withWhiteBg : List (Html Msg) -> List (Html Msg)
+withWhiteBg elements =
+    [ Html.div
+        [ Html.Attributes.style "background" "white"
+        , Html.Attributes.style "width" "100%"
+        , Html.Attributes.style "height" "100%"
+        ]
+        elements
+    ]
 
 
 viewHtmlTopLeft : Float -> Float -> Float -> List Sprite -> List (Html Msg)
@@ -304,6 +347,7 @@ viewHtmlTransformTranslate width height spriteSize sprites =
                             ++ ","
                             ++ (height - spriteSize + (height * -sprite.y) |> px)
                         )
+                    , Html.Attributes.style "will-change" "transform"
                     ]
                     []
             )
@@ -422,7 +466,7 @@ vertexShader =
         attribute vec3 position;
         attribute vec3 color;
         uniform float x;
-        funiform float y;
+        uniform float y;
         varying vec3 vcolor;
         void main () {
             vec3 newPostion = vec3(x - 0.5, y - 0.5, 0) + position;

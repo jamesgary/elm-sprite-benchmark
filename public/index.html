@@ -3,14 +3,28 @@
   <head>
     <title>GOTTA GO FAST</title>
     <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+
       #stats div {
         left: 250px !important;
+      }
+
+      #pixi {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 600px;
+        height: 400px;
+        border: 1px solid black;
       }
     </style>
   </head>
   <body>
+    <div id="pixi"></div>
     <div id="elm"></div>
-    <div id="pixi" style="position: absolute; top: 5px; right: 5px"></div>
     <div id="stats"></div>
 
     <script src="./js/pixi.min.js"></script>
@@ -32,6 +46,7 @@
           var app = new PIXI.Application({
             width: 600,
             height: 400,
+            backgroundColor: 0xFFFFFF,
           });
           document.getElementById('pixi').appendChild(app.view);
 
