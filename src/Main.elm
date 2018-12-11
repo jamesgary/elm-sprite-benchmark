@@ -443,8 +443,9 @@ encodeSprites sprites =
         |> Json.Encode.list
             (\sprite ->
                 Json.Encode.object
-                    [ ( "x", Json.Encode.float sprite.x )
-                    , ( "y", Json.Encode.float sprite.y )
+                    -- offset anchor just to match html views
+                    [ ( "x", Json.Encode.float (sprite.x + (0.5 * spriteSize / width)) )
+                    , ( "y", Json.Encode.float (sprite.y + (0.5 * spriteSize / height)) )
                     ]
             )
 

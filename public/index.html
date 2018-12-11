@@ -51,6 +51,7 @@
           });
           document.getElementById('pixi').appendChild(app.view);
 
+          // assuming 60,000 sprites is our limit
           spritesContainer = new PIXI.particles.ParticleContainer(60000, {
             //scale: true,
             position: true,
