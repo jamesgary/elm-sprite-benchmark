@@ -54,6 +54,7 @@ type alias Model =
     { sprites : List Sprite
     , seed : Random.Seed
     , renderer : Renderer
+    , hoveringRenderer : Maybe Renderer
 
     -- Zinggi's Game 2D library
     , resources : Game.Resources.Resources
@@ -83,6 +84,8 @@ type Msg
     = Tick Float
     | ChangeRenderer Renderer
     | Resources Game.Resources.Msg
+    | ButtonEnter Renderer
+    | ButtonLeave
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -98,8 +101,9 @@ init flags =
     in
     ( { sprites = newSprites
       , seed = newSeed
-      , renderer = HtmlTransformTranslate -- WebGLRenderer --HtmlTopLeft
+      , renderer = HtmlTopLeft
       , resources = Game.Resources.init
+      , hoveringRenderer = Nothing
       }
     , Game.Resources.loadTextures [ "cat.png" ]
         |> Cmd.map Resources
@@ -228,6 +232,12 @@ update msg model =
             , Cmd.none
             )
 
+        ButtonEnter renderer ->
+            ( { model | hoveringRenderer = Just renderer }, Cmd.none )
+
+        ButtonLeave ->
+            ( { model | hoveringRenderer = Nothing }, Cmd.none )
+
 
 spriteGenerator : Random.Generator Sprite
 spriteGenerator =
@@ -258,89 +268,169 @@ view model =
         [ Html.Attributes.style "display" "flex"
         , Html.Attributes.style "margin" (px canvasMargin)
         ]
-        [ -- canvases
+        [ -- canvas, buttons, and description
           Html.div
-            [ Html.Attributes.style "width" (px width)
-            , Html.Attributes.style "height" (px height)
-
-            --, Html.Attributes.style "padding-right" (px spriteSize)
-            , Html.Attributes.style "border" "1px solid black"
-            , Html.Attributes.style "position" "relative"
-
-            --, Html.Attributes.style "background" "rgba(0,255,255,0.1)"
-            , Html.Attributes.style "overflow" "hidden"
+            [ Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "align-items" "flex-start"
             ]
-            (case model.renderer of
-                HtmlTopLeft ->
-                    viewHtmlTopLeft model.sprites
-                        |> withWhiteBg
-
-                HtmlTransformTranslate ->
-                    viewHtmlTransformTranslate model.sprites
-                        |> withWhiteBg
-
-                None ->
-                    []
-                        |> withWhiteBg
-
-                Zinggi ->
-                    viewZinggi model.resources model.sprites
-                        |> withWhiteBg
-
-                DataAttrs ->
-                    viewDataAttrs model.sprites
-                        |> withWhiteBg
-
-                PixiJsDataAttrs ->
-                    viewPixiJsDataAttrs model.sprites
-
-                PixiJsPorts ->
-                    []
-
-                WebGLRenderer ->
-                    viewWebGL model.sprites
-                        |> withWhiteBg
-            )
-        , -- buttons
-          Html.div
-            [ Html.Attributes.style "margin" "0 10px"
-            , Html.Attributes.style "display" "flex"
-            , Html.Attributes.style "flex-direction" "column"
-            ]
-            (List.map
-                (\( renderer, str ) ->
-                    Html.button
-                        ([ Html.Attributes.style "font-size" "16px"
-                         , Html.Attributes.style "margin" "0 0 5px"
-                         , Html.Attributes.style "padding" "5px 10px"
-                         , Html.Attributes.style "border-color" "#6cf #7bf #1af"
-                         ]
-                            ++ (if model.renderer == renderer then
-                                    [ Html.Attributes.disabled True
-                                    , Html.Attributes.style "background" "#dff"
-                                    , Html.Attributes.style "color" "black"
-                                    ]
-
-                                else
-                                    [ Html.Events.onClick (ChangeRenderer renderer)
-                                    , Html.Attributes.style "background" "#adf"
-                                    , Html.Attributes.style "color" "black"
-                                    , Html.Attributes.style "cursor" "pointer"
-                                    ]
-                               )
-                        )
-                        [ Html.text str ]
-                )
-                [ ( HtmlTopLeft, "HTML: top, left" )
-                , ( HtmlTransformTranslate, "HTML: transform" )
-                , ( Zinggi, "Zinggi Game.TwoD" )
-                , ( DataAttrs, "Just data attrs" )
-                , ( PixiJsDataAttrs, "PixiJS with data attrs" )
-                , ( PixiJsPorts, "PixiJS ports" )
-                , ( None, "None" )
-                , ( WebGLRenderer, "WebGL" )
+            [ -- canvases
+              Html.div
+                [ Html.Attributes.style "width" (px width)
+                , Html.Attributes.style "height" (px height)
+                , Html.Attributes.style "border" "1px solid black"
+                , Html.Attributes.style "position" "relative"
+                , Html.Attributes.style "overflow" "hidden"
                 ]
-            )
+                (case model.renderer of
+                    HtmlTopLeft ->
+                        viewHtmlTopLeft model.sprites
+                            |> withWhiteBg
+
+                    HtmlTransformTranslate ->
+                        viewHtmlTransformTranslate model.sprites
+                            |> withWhiteBg
+
+                    None ->
+                        []
+                            |> withWhiteBg
+
+                    Zinggi ->
+                        viewZinggi model.resources model.sprites
+                            |> withWhiteBg
+
+                    DataAttrs ->
+                        viewDataAttrs model.sprites
+                            |> withWhiteBg
+
+                    PixiJsDataAttrs ->
+                        viewPixiJsDataAttrs model.sprites
+
+                    PixiJsPorts ->
+                        []
+
+                    WebGLRenderer ->
+                        viewWebGL model.sprites
+                            |> withWhiteBg
+                )
+            , -- buttons
+              Html.div
+                [ Html.Attributes.style "margin" "0 10px"
+                , Html.Attributes.style "display" "flex"
+                , Html.Attributes.style "flex-direction" "column"
+                ]
+                (List.map
+                    (\( renderer, str ) ->
+                        Html.button
+                            ([ Html.Attributes.style "font-size" "16px"
+                             , Html.Attributes.style "margin" "0 0 5px"
+                             , Html.Attributes.style "padding" "5px 10px"
+                             , Html.Attributes.style "border-color" "#6cf #7bf #1af"
+                             , Html.Events.onMouseEnter (ButtonEnter renderer)
+                             , Html.Events.onMouseLeave ButtonLeave
+                             ]
+                                ++ (if model.renderer == renderer then
+                                        [ --Html.Attributes.disabled True -- can't listen to onMouseLeave
+                                          Html.Attributes.style "background" "#dff"
+                                        , Html.Attributes.style "color" "black"
+                                        ]
+
+                                    else
+                                        [ Html.Events.onClick (ChangeRenderer renderer)
+                                        , Html.Attributes.style "background" "#adf"
+                                        , Html.Attributes.style "color" "black"
+                                        , Html.Attributes.style "cursor" "pointer"
+                                        ]
+                                   )
+                            )
+                            [ Html.text str ]
+                    )
+                    [ ( HtmlTopLeft, "HTML: top, left" )
+                    , ( HtmlTransformTranslate, "HTML: transform" )
+                    , ( Zinggi, "Zinggi Game.TwoD" )
+                    , ( PixiJsDataAttrs, "PixiJS with data attrs" )
+                    , ( PixiJsPorts, "PixiJS ports" )
+                    , ( DataAttrs, "Just data attrs" )
+                    , ( None, "None" )
+                    , ( WebGLRenderer, "WebGL" )
+                    ]
+                )
+            , case model.hoveringRenderer of
+                Nothing ->
+                    Html.text ""
+
+                Just hoveringRenderer ->
+                    Html.span
+                        [ Html.Attributes.style "background" "white"
+                        , Html.Attributes.style "border" "3px ridge #ccc"
+                        , Html.Attributes.style "padding" "10px"
+                        , Html.Attributes.style "font-family" "sans-serif"
+                        , Html.Attributes.style "display" "inline-block"
+                        , Html.Attributes.style "position" "relative"
+                        , Html.Attributes.style "width" "200px"
+                        , Html.Attributes.style "line-height" "20px"
+                        ]
+                        (case hoveringRenderer of
+                            HtmlTopLeft ->
+                                [ Html.text "Sprites are HTML "
+                                , code "<img>"
+                                , Html.text " elements positioned with CSS properties "
+                                , code "top"
+                                , Html.text " and "
+                                , code "left"
+                                , Html.text "."
+                                ]
+
+                            HtmlTransformTranslate ->
+                                [ Html.text "Sprites are HTML "
+                                , code "<img>"
+                                , Html.text " elements positioned with CSS properties "
+                                , code "transform: translate(x, y)"
+                                , Html.text "."
+                                , Html.br [] []
+                                , Html.br [] []
+                                , Html.text "This should be faster since it uses the GPU, but it does not. Maybe it's better suited for fewer sprites and doesn't scale to hundreds? I'm not sure!"
+                                , Html.br [] []
+                                , Html.br [] []
+                                , Html.strong [] [ Html.text "Warning: " ]
+                                , Html.text "This may lock up your browser if there are already many sprites to draw!"
+                                ]
+
+                            Zinggi ->
+                                [ Html.text "This uses Zinggi's rendering engine "
+                                , code "elm-2d-game"
+                                , Html.text " written in Elm and uses "
+                                , code "elm-explorations/webgl"
+                                , Html.text ". It gets pretty good results, but since it creates a new entity for every sprite, it doesn't seem scale beyond a thousand sprites."
+                                ]
+
+                            DataAttrs ->
+                                [ Html.text "This encodes the sprite data to a JSON string and sets it to the data attribute value of an HTML element."
+                                , Html.br [] []
+                                , Html.br [] []
+                                , Html.text "This demonstrates how slow writing to the DOM is, even for non-visible changes."
+                                ]
+
+                            PixiJsDataAttrs ->
+                                [ Html.text "This encodes the sprite data to a JSON string and sets it to the data attribute value of an HTML element."
+                                , Html.br [] []
+                                , Html.br [] []
+                                , Html.text "On the Javascript side, we use PixiJS to read from that data attribute and draw to its own canvas."
+                                ]
+
+                            PixiJsPorts ->
+                                [ Html.text "This encodes the sprite data to a JSON string and sends it through a port."
+                                , Html.br [] []
+                                , Html.br [] []
+                                , Html.text "On the Javascript side, we listen to this port and use PixiJS to read the sprite data and draw to its own canvas."
+                                ]
+
+                            None ->
+                                [ Html.text "This renders nothing! But it still calculates the positions of the sprites. It's just used as a max baseline." ]
+
+                            WebGLRenderer ->
+                                [ Html.text "This is unfinished!" ]
+                        )
+            ]
 
         -- count
         , Html.div
@@ -349,6 +439,15 @@ view model =
             ]
             [ Html.text ("Total sprites: " ++ String.fromInt (List.length model.sprites)) ]
         ]
+
+
+code : String -> Html Msg
+code str =
+    Html.code
+        [ Html.Attributes.style "background" "#eee"
+        , Html.Attributes.style "padding" "2px"
+        ]
+        [ Html.text str ]
 
 
 withWhiteBg : List (Html Msg) -> List (Html Msg)
