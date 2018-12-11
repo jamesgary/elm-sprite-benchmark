@@ -16,6 +16,22 @@ import Random
 import WebGL exposing (Mesh, Shader)
 
 
+width =
+    600
+
+
+height =
+    400
+
+
+canvasMargin =
+    10
+
+
+spriteSize =
+    32
+
+
 port sendSprites : Json.Encode.Value -> Cmd msg
 
 
@@ -58,9 +74,8 @@ type Renderer
 type alias Sprite =
     { x : Float
     , y : Float
-    , xVel : Float
-    , yVel : Float
-    , bounceSpeed : Float
+    , angle : Float
+    , speed : Float
     }
 
 
@@ -135,38 +150,53 @@ update msg model =
             ( { model
                 | sprites =
                     newSprites
+                        --|> always model.sprites
                         |> List.map
                             (\sprite ->
                                 let
-                                    ( xTravelDist, yTravelDist ) =
-                                        ( delta * sprite.xVel
-                                        , delta * sprite.yVel
-                                        )
-
                                     ( newX, newY ) =
-                                        ( sprite.x + xTravelDist
-                                        , sprite.y + yTravelDist
-                                        )
+                                        ( sprite.speed, sprite.angle )
+                                            |> fromPolar
+                                            |> (\( x, y ) ->
+                                                    ( sprite.x + x
+                                                    , sprite.y + y
+                                                    )
+                                               )
 
-                                    ( x, xVel ) =
-                                        if newX < 0 || newX > 1 then
-                                            ( sprite.x - xTravelDist, -sprite.xVel )
+                                    -- could be better :/
+                                    min =
+                                        -0.1
+
+                                    max =
+                                        1.0
+
+                                    diff =
+                                        max - min
+
+                                    wrappedX =
+                                        if newX < min then
+                                            max
+
+                                        else if newX > max then
+                                            min
 
                                         else
-                                            ( newX, sprite.xVel )
+                                            newX
 
-                                    ( y, yVel ) =
-                                        if sprite.y + yTravelDist < 0 then
-                                            ( sprite.y - yTravelDist, sprite.bounceSpeed )
+                                    wrappedY =
+                                        if newY < min then
+                                            max
+
+                                        else if newY > max then
+                                            min
 
                                         else
-                                            ( sprite.y + yTravelDist, sprite.yVel )
+                                            newY
                                 in
-                                { x = x |> max 0 |> min 1
-                                , y = y |> max 0 |> min 1
-                                , xVel = xVel
-                                , yVel = yVel - (gravity * delta)
-                                , bounceSpeed = sprite.bounceSpeed
+                                { x = wrappedX
+                                , y = wrappedY
+                                , angle = sprite.angle
+                                , speed = sprite.speed
                                 }
                             )
                 , seed = newSeed
@@ -197,18 +227,18 @@ update msg model =
 
 spriteGenerator : Random.Generator Sprite
 spriteGenerator =
-    Random.map3
-        (\x xVel bounceSpeed ->
-            { x = 0
-            , y = 0
-            , xVel = xVel
-            , yVel = bounceSpeed
-            , bounceSpeed = bounceSpeed
+    Random.map4
+        (\x y angle speed ->
+            { x = x
+            , y = y
+            , angle = angle
+            , speed = speed
             }
         )
         (Random.float 0 1)
-        (Random.float -2 2)
-        (Random.float 1 2.8)
+        (Random.float 0 1)
+        (Random.float 0 (2 * pi))
+        (Random.float 0.0001 0.005)
 
 
 subscriptions : Model -> Sub Msg
@@ -220,19 +250,6 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    let
-        width =
-            600
-
-        height =
-            400
-
-        canvasMargin =
-            10
-
-        spriteSize =
-            32
-    in
     Html.div
         [ Html.Attributes.style "display" "flex"
         , Html.Attributes.style "margin" (px canvasMargin)
@@ -251,11 +268,11 @@ view model =
             ]
             (case model.renderer of
                 HtmlTopLeft ->
-                    viewHtmlTopLeft width height spriteSize model.sprites
+                    viewHtmlTopLeft model.sprites
                         |> withWhiteBg
 
                 HtmlTransformTranslate ->
-                    viewHtmlTransformTranslate width height spriteSize model.sprites
+                    viewHtmlTransformTranslate model.sprites
                         |> withWhiteBg
 
                 None ->
@@ -263,21 +280,21 @@ view model =
                         |> withWhiteBg
 
                 Zinggi ->
-                    viewZinggi model.resources width height spriteSize model.sprites
+                    viewZinggi model.resources model.sprites
                         |> withWhiteBg
 
                 DataAttrs ->
-                    viewDataAttrs width height spriteSize model.sprites
+                    viewDataAttrs model.sprites
                         |> withWhiteBg
 
                 PixiJsDataAttrs ->
-                    viewPixiJsDataAttrs width height spriteSize model.sprites
+                    viewPixiJsDataAttrs model.sprites
 
                 PixiJsPorts ->
                     []
 
                 WebGLRenderer ->
-                    viewWebGL width height spriteSize model.sprites
+                    viewWebGL model.sprites
                         |> withWhiteBg
             )
         , -- buttons
@@ -330,8 +347,8 @@ withWhiteBg elements =
     ]
 
 
-viewHtmlTopLeft : Float -> Float -> Float -> List Sprite -> List (Html Msg)
-viewHtmlTopLeft width height spriteSize sprites =
+viewHtmlTopLeft : List Sprite -> List (Html Msg)
+viewHtmlTopLeft sprites =
     -- around 800
     sprites
         |> List.map
@@ -348,8 +365,8 @@ viewHtmlTopLeft width height spriteSize sprites =
             )
 
 
-viewHtmlTransformTranslate : Float -> Float -> Float -> List Sprite -> List (Html Msg)
-viewHtmlTransformTranslate width height spriteSize sprites =
+viewHtmlTransformTranslate : List Sprite -> List (Html Msg)
+viewHtmlTransformTranslate sprites =
     -- around 700
     sprites
         |> List.map
@@ -371,8 +388,8 @@ viewHtmlTransformTranslate width height spriteSize sprites =
             )
 
 
-viewZinggi : Game.Resources.Resources -> Float -> Float -> Float -> List Sprite -> List (Html Msg)
-viewZinggi resources width height spriteSize sprites =
+viewZinggi : Game.Resources.Resources -> List Sprite -> List (Html Msg)
+viewZinggi resources sprites =
     [ Game.TwoD.render
         { time = 0
         , size = ( round width, round height )
@@ -391,8 +408,8 @@ viewZinggi resources width height spriteSize sprites =
     ]
 
 
-viewDataAttrs : Float -> Float -> Float -> List Sprite -> List (Html Msg)
-viewDataAttrs width height spriteSize sprites =
+viewDataAttrs : List Sprite -> List (Html Msg)
+viewDataAttrs sprites =
     [ Html.div
         [ Html.Attributes.attribute "data-sprites" (spritesToAttrVal sprites)
         , Html.Attributes.id "sprite-data"
@@ -401,8 +418,8 @@ viewDataAttrs width height spriteSize sprites =
     ]
 
 
-viewPixiJsDataAttrs : Float -> Float -> Float -> List Sprite -> List (Html Msg)
-viewPixiJsDataAttrs width height spriteSize sprites =
+viewPixiJsDataAttrs : List Sprite -> List (Html Msg)
+viewPixiJsDataAttrs sprites =
     [ Html.div
         [ Html.Attributes.attribute "data-sprites" (spritesToAttrVal sprites)
         , Html.Attributes.id "sprite-data-for-pixijs"
@@ -447,8 +464,8 @@ hasInit =
     False
 
 
-viewWebGL : Float -> Float -> Float -> List Sprite -> List (Html Msg)
-viewWebGL width height spriteSize sprites =
+viewWebGL : List Sprite -> List (Html Msg)
+viewWebGL sprites =
     [ WebGL.toHtml
         [ Html.Attributes.width 600
         , Html.Attributes.height 400
