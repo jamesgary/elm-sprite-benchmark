@@ -120,17 +120,21 @@ update msg model =
                 minTick =
                     1 / 55
 
+                spritesLength =
+                    model.sprites
+                        |> List.length
+
                 ( newSprites, newSeed ) =
                     if delta > minTick then
                         -- too slow! remove some sprites (down to 1 sprite)
-                        model.sprites
-                            |> List.length
+                        spritesLength
                             |> toFloat
                             |> (*) (2 * minTick)
                             |> ceiling
-                            |> min (List.length model.sprites - 1)
+                            |> min (spritesLength - 1)
                             |> (\decreaseAmt ->
                                     ( List.drop decreaseAmt model.sprites, model.seed )
+                                --( List.take (List.length model.sprites - decreaseAmt) model.sprites, model.seed )
                                )
 
                     else
@@ -238,7 +242,7 @@ spriteGenerator =
         (Random.float 0 1)
         (Random.float 0 1)
         (Random.float 0 (2 * pi))
-        (Random.float 0.0001 0.005)
+        (Random.float 0.00001 0.0005)
 
 
 subscriptions : Model -> Sub Msg
@@ -430,11 +434,7 @@ viewPixiJsDataAttrs sprites =
 
 spritesToAttrVal : List Sprite -> String
 spritesToAttrVal sprites =
-    if False then
-        encodeSpritesWithString sprites
-
-    else
-        encodeSprites sprites |> Json.Encode.encode 0
+    encodeSprites sprites |> Json.Encode.encode 0
 
 
 encodeSprites : List Sprite -> Json.Encode.Value
@@ -447,17 +447,6 @@ encodeSprites sprites =
                     , ( "y", Json.Encode.float sprite.y )
                     ]
             )
-
-
-encodeSpritesWithString : List Sprite -> String
-encodeSpritesWithString sprites =
-    sprites
-        |> List.map
-            (\sprite ->
-                "{\"x\":" ++ String.fromFloat sprite.x ++ ",\"y\":" ++ String.fromFloat sprite.y ++ "}"
-            )
-        |> String.join ","
-        |> (\str -> "[" ++ str ++ "]")
 
 
 hasInit =
