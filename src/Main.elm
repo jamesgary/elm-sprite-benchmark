@@ -11,9 +11,12 @@ import Html.Attributes
 import Html.Events
 import Json.Encode
 import Math.Matrix4 as Mat4 exposing (Mat4)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2)
 import Math.Vector3 as Vec3 exposing (Vec3, vec3)
 import Random
+import Task
 import WebGL exposing (Mesh, Shader)
+import WebGL.Texture exposing (Texture, defaultOptions)
 
 
 width =
@@ -56,6 +59,9 @@ type alias Model =
     , renderer : Renderer
     , hoveringRenderer : Maybe Renderer
 
+    -- elm-explorations/webgl
+    , texture : Maybe Texture
+
     -- Zinggi's Game 2D library
     , resources : Game.Resources.Resources
     }
@@ -83,9 +89,11 @@ type alias Sprite =
 type Msg
     = Tick Float
     | ChangeRenderer Renderer
-    | Resources Game.Resources.Msg
     | ButtonEnter Renderer
     | ButtonLeave
+    | TextureLoaded Texture
+    | TextureError
+    | Resources Game.Resources.Msg
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -101,12 +109,30 @@ init flags =
     in
     ( { sprites = newSprites
       , seed = newSeed
-      , renderer = HtmlTopLeft
-      , resources = Game.Resources.init
+      , renderer = WebGLRenderer
       , hoveringRenderer = Nothing
+      , texture = Nothing
+      , resources = Game.Resources.init
       }
-    , Game.Resources.loadTextures [ "cat.png" ]
-        |> Cmd.map Resources
+    , Cmd.batch
+        [ "cat.png"
+            |> WebGL.Texture.loadWith
+                { defaultOptions
+                    | magnify = WebGL.Texture.nearest
+                    , minify = WebGL.Texture.nearest
+                }
+            |> Task.attempt
+                (\result ->
+                    case result of
+                        Ok texture ->
+                            TextureLoaded texture
+
+                        Err _ ->
+                            TextureError
+                )
+        , Game.Resources.loadTextures [ "cat.png" ]
+            |> Cmd.map Resources
+        ]
     )
 
 
@@ -224,6 +250,12 @@ update msg model =
             , Cmd.none
             )
 
+        ButtonEnter renderer ->
+            ( { model | hoveringRenderer = Just renderer }, Cmd.none )
+
+        ButtonLeave ->
+            ( { model | hoveringRenderer = Nothing }, Cmd.none )
+
         Resources resourcesMsg ->
             ( { model
                 | resources =
@@ -232,11 +264,12 @@ update msg model =
             , Cmd.none
             )
 
-        ButtonEnter renderer ->
-            ( { model | hoveringRenderer = Just renderer }, Cmd.none )
+        TextureLoaded texture ->
+            ( { model | texture = Just texture }, Cmd.none )
 
-        ButtonLeave ->
-            ( { model | hoveringRenderer = Nothing }, Cmd.none )
+        TextureError ->
+            -- TODO error?
+            ( model, Cmd.none )
 
 
 spriteGenerator : Random.Generator Sprite
@@ -266,7 +299,9 @@ view : Model -> Html Msg
 view model =
     Html.div
         [ Html.Attributes.style "display" "flex"
+        , Html.Attributes.style "flex-direction" "column"
         , Html.Attributes.style "margin" (px canvasMargin)
+        , Html.Attributes.style "font-family" "sans-serif"
         ]
         [ -- canvas, buttons, and description
           Html.div
@@ -309,8 +344,14 @@ view model =
                         []
 
                     WebGLRenderer ->
-                        viewWebGL model.sprites
-                            |> withWhiteBg
+                        case model.texture of
+                            Just tex ->
+                                viewWebGL tex model.sprites
+                                    |> withWhiteBg
+
+                            Nothing ->
+                                [ Html.text "Loading texture..." ]
+                                    |> withWhiteBg
                 )
             , -- buttons
               Html.div
@@ -363,7 +404,6 @@ view model =
                         [ Html.Attributes.style "background" "white"
                         , Html.Attributes.style "border" "3px ridge #ccc"
                         , Html.Attributes.style "padding" "10px"
-                        , Html.Attributes.style "font-family" "sans-serif"
                         , Html.Attributes.style "display" "inline-block"
                         , Html.Attributes.style "position" "relative"
                         , Html.Attributes.style "width" "200px"
@@ -422,6 +462,9 @@ view model =
                                 , Html.br [] []
                                 , Html.br [] []
                                 , Html.text "On the Javascript side, we listen to this port and use PixiJS to read the sprite data and draw to its own canvas."
+                                , Html.br [] []
+                                , Html.br [] []
+                                , Html.text "This is fastest by a long shot!"
                                 ]
 
                             None ->
@@ -434,8 +477,7 @@ view model =
 
         -- count
         , Html.div
-            [ Html.Attributes.style "position" "absolute"
-            , Html.Attributes.style "bottom" "0"
+            [ Html.Attributes.style "margin" "10px 0"
             ]
             [ Html.text ("Total sprites: " ++ String.fromInt (List.length model.sprites)) ]
         ]
@@ -564,11 +606,11 @@ hasInit =
     False
 
 
-viewWebGL : List Sprite -> List (Html Msg)
-viewWebGL sprites =
+viewWebGL : Texture -> List Sprite -> List (Html Msg)
+viewWebGL texture sprites =
     [ WebGL.toHtml
-        [ Html.Attributes.width 600
-        , Html.Attributes.height 400
+        [ Html.Attributes.width width
+        , Html.Attributes.height height
         ]
         (sprites
             |> List.map
@@ -577,7 +619,10 @@ viewWebGL sprites =
                         vertexShader
                         fragmentShader
                         cubeMesh
-                        { x = x, y = y }
+                        { x = x
+                        , y = y
+                        , texture = texture
+                        }
                 )
         )
     ]
@@ -586,38 +631,44 @@ viewWebGL sprites =
 type alias Uniforms =
     { x : Float
     , y : Float
+    , texture : Texture
     }
 
 
 type alias Vertex =
     { color : Vec3
     , position : Vec3
+    , coord : Vec2
     }
 
 
-vertexShader : Shader Vertex Uniforms { vcolor : Vec3 }
+vertexShader : Shader Vertex Uniforms { vcoord : Vec2 }
 vertexShader =
     [glsl|
         attribute vec3 position;
-        attribute vec3 color;
         uniform float x;
         uniform float y;
-        varying vec3 vcolor;
+        varying vec2 vcoord;
         void main () {
-            vec3 newPostion = vec3(x - 0.5, y - 0.5, 0) + position;
+            vec3 newPostion = vec3(
+              x * 2.0 - 1.0,
+              y * 2.0 - 1.0,
+            0) + position;
+
             gl_Position = vec4(newPostion, 1.0);
-            vcolor = color;
+            vcoord = vec2(x,y);
         }
     |]
 
 
-fragmentShader : Shader {} Uniforms { vcolor : Vec3 }
+fragmentShader : Shader {} Uniforms { vcoord : Vec2 }
 fragmentShader =
     [glsl|
         precision mediump float;
-        varying vec3 vcolor;
+        uniform sampler2D texture;
+        varying vec2 vcoord;
         void main () {
-            gl_FragColor = vec4(vcolor, 1.0);
+            gl_FragColor = texture2D(texture, vcoord);
         }
     |]
 
@@ -637,7 +688,7 @@ cubeMesh =
         rbt =
             vec3 0.1 -0.1 0
     in
-    [ face (vec3 237 212 0) rft lft lbt rbt -- yellow
+    [ face (vec3 237 212 100) rft lft lbt rbt -- yellow
     ]
         |> List.concat
         |> WebGL.triangles
@@ -647,11 +698,41 @@ face : Vec3 -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> List ( Vertex, Vertex, Vertex )
 face color a b c d =
     let
         vertex position =
-            Vertex (Vec3.scale (1 / 255) color) position
+            Vertex
+                (Vec3.scale (1 / 255) color)
+                position
+                (vec2 0 0)
     in
     [ ( vertex a, vertex b, vertex c )
     , ( vertex c, vertex d, vertex a )
     ]
+
+
+squareMesh : Mesh Vertex
+squareMesh =
+    let
+        vertex position coord =
+            { position = position
+            , color = vec3 110.5 110.5 110.5
+            , coord = coord
+            }
+
+        topLeft =
+            vertex (vec3 -1 1 1) (vec2 0 1)
+
+        topRight =
+            vertex (vec3 1 1 1) (vec2 1 1)
+
+        bottomLeft =
+            vertex (vec3 -1 -1 1) (vec2 0 0)
+
+        bottomRight =
+            vertex (vec3 1 -1 1) (vec2 1 0)
+    in
+    [ ( topLeft, topRight, bottomLeft )
+    , ( bottomLeft, topRight, bottomRight )
+    ]
+        |> WebGL.triangles
 
 
 px : Float -> String
