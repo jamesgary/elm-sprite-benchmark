@@ -16,6 +16,7 @@ import Math.Vector3 as Vec3 exposing (Vec3, vec3)
 import Random
 import Task
 import WebGL exposing (Mesh, Shader)
+import WebGL.Settings
 import WebGL.Texture exposing (Texture, defaultOptions)
 
 
@@ -118,7 +119,9 @@ init flags =
         [ "cat.png"
             |> WebGL.Texture.loadWith
                 { defaultOptions
-                    | magnify = WebGL.Texture.nearest
+                  --| magnify = WebGL.Texture.nearest
+                  --, minify = WebGL.Texture.nearest
+                    | magnify = WebGL.Texture.linear
                     , minify = WebGL.Texture.nearest
                 }
             |> Task.attempt
@@ -184,7 +187,7 @@ update msg model =
             ( { model
                 | sprites =
                     newSprites
-                        --|> always model.sprites
+                        |> always model.sprites
                         |> List.map
                             (\sprite ->
                                 let
@@ -197,32 +200,34 @@ update msg model =
                                                     )
                                                )
 
-                                    -- could be better :/
-                                    min =
-                                        -0.1
+                                    minWidth =
+                                        -0.5 * spriteSize
 
-                                    max =
-                                        1.0
+                                    maxWidth =
+                                        width + (0.5 * spriteSize)
 
-                                    diff =
-                                        max - min
+                                    minHeight =
+                                        -spriteSize
+
+                                    maxHeight =
+                                        height
 
                                     wrappedX =
-                                        if newX < min then
-                                            max
+                                        if newX < minWidth then
+                                            maxWidth
 
-                                        else if newX > max then
-                                            min
+                                        else if newX > maxWidth then
+                                            minWidth
 
                                         else
                                             newX
 
                                     wrappedY =
-                                        if newY < min then
-                                            max
+                                        if newY < minHeight then
+                                            maxHeight
 
-                                        else if newY > max then
-                                            min
+                                        else if newY > maxHeight then
+                                            minHeight
 
                                         else
                                             newY
@@ -282,10 +287,10 @@ spriteGenerator =
             , speed = speed
             }
         )
-        (Random.float 0 1)
-        (Random.float 0 1)
+        (Random.float 0 width)
+        (Random.float 0 height)
         (Random.float 0 (2 * pi))
-        (Random.float 0.00001 0.0005)
+        (Random.float 0.01 1)
 
 
 subscriptions : Model -> Sub Msg
@@ -514,8 +519,8 @@ viewHtmlTopLeft sprites =
                     , Html.Attributes.style "width" (px spriteSize)
                     , Html.Attributes.style "height" (px spriteSize)
                     , Html.Attributes.style "position" "absolute"
-                    , Html.Attributes.style "left" (width * sprite.x |> px)
-                    , Html.Attributes.style "bottom" (height * sprite.y |> px)
+                    , Html.Attributes.style "left" (sprite.x |> px)
+                    , Html.Attributes.style "bottom" (sprite.y |> px)
                     ]
                     []
             )
@@ -534,9 +539,9 @@ viewHtmlTransformTranslate sprites =
                     , Html.Attributes.style "position" "absolute"
                     , Html.Attributes.style "transform"
                         ("translate("
-                            ++ (width * sprite.x |> px)
+                            ++ (sprite.x |> px)
                             ++ ","
-                            ++ (height - spriteSize + (height * -sprite.y) |> px)
+                            ++ (height - spriteSize - sprite.y |> px)
                         )
                     , Html.Attributes.style "will-change" "transform"
                     ]
@@ -556,7 +561,7 @@ viewZinggi resources sprites =
                 (\sprite ->
                     Game.TwoD.Render.sprite
                         { texture = Game.Resources.getTexture "cat.png" resources
-                        , position = ( sprite.x * width, sprite.y * height )
+                        , position = ( sprite.x, sprite.y )
                         , size = ( spriteSize, spriteSize )
                         }
                 )
@@ -596,8 +601,8 @@ encodeSprites sprites =
             (\sprite ->
                 Json.Encode.object
                     -- offset anchor just to match html views
-                    [ ( "x", Json.Encode.float (sprite.x + (0.5 * spriteSize / width)) )
-                    , ( "y", Json.Encode.float (sprite.y + (0.5 * spriteSize / height)) )
+                    [ ( "x", Json.Encode.float (sprite.x + (0.5 * spriteSize)) )
+                    , ( "y", Json.Encode.float (sprite.y + (0.5 * spriteSize)) )
                     ]
             )
 
@@ -608,37 +613,52 @@ hasInit =
 
 viewWebGL : Texture -> List Sprite -> List (Html Msg)
 viewWebGL texture sprites =
-    [ WebGL.toHtml
+    [ WebGL.toHtmlWith
+        [ WebGL.alpha True
+        , WebGL.antialias
+        ]
         [ Html.Attributes.width width
         , Html.Attributes.height height
+        , Html.Attributes.style "background" "white"
         ]
         (sprites
             |> List.map
                 (\{ x, y } ->
-                    WebGL.entity
+                    WebGL.entityWith
+                        [ WebGL.Settings.sampleAlphaToCoverage ]
                         vertexShader
                         fragmentShader
-                        cubeMesh
-                        { x = x
-                        , y = y
-                        , texture = texture
+                        squareMesh
+                        { texture = texture
+                        , perspective = perspective x y
                         }
                 )
         )
     ]
 
 
-type alias Uniforms =
-    { x : Float
-    , y : Float
-    , texture : Texture
-    }
+perspective : Float -> Float -> Mat4
+perspective x y =
+    let
+        mod =
+            1 / spriteSize
+    in
+    Mat4.makeScale3 (spriteSize / width) (spriteSize / height) 1
+        |> Mat4.translate3
+            (1 + -1.0 * (width / spriteSize) + ((2 / spriteSize) * x))
+            (1 + -1.0 * (height / spriteSize) + ((2 / spriteSize) * y))
+            0
 
 
 type alias Vertex =
-    { color : Vec3
-    , position : Vec3
+    { position : Vec3
     , coord : Vec2
+    }
+
+
+type alias Uniforms =
+    { perspective : Mat4
+    , texture : Texture
     }
 
 
@@ -646,17 +666,12 @@ vertexShader : Shader Vertex Uniforms { vcoord : Vec2 }
 vertexShader =
     [glsl|
         attribute vec3 position;
-        uniform float x;
-        uniform float y;
+        attribute vec2 coord;
+        uniform mat4 perspective;
         varying vec2 vcoord;
         void main () {
-            vec3 newPostion = vec3(
-              x * 2.0 - 1.0,
-              y * 2.0 - 1.0,
-            0) + position;
-
-            gl_Position = vec4(newPostion, 1.0);
-            vcoord = vec2(x,y);
+          gl_Position = perspective * vec4(position, 1.0);
+          vcoord = coord.xy;
         }
     |]
 
@@ -668,44 +683,13 @@ fragmentShader =
         uniform sampler2D texture;
         varying vec2 vcoord;
         void main () {
-            gl_FragColor = texture2D(texture, vcoord);
+          vec3 rgb = texture2D(texture, vcoord).xyz;
+          vec4 rgba = vec4(rgb, 0.5);
+          gl_FragColor = rgba;
+
+          gl_FragColor = texture2D(texture, vcoord);
         }
     |]
-
-
-cubeMesh : Mesh Vertex
-cubeMesh =
-    let
-        rft =
-            vec3 0.1 0.1 0
-
-        lft =
-            vec3 -0.1 0.1 0
-
-        lbt =
-            vec3 -0.1 -0.1 0
-
-        rbt =
-            vec3 0.1 -0.1 0
-    in
-    [ face (vec3 237 212 100) rft lft lbt rbt -- yellow
-    ]
-        |> List.concat
-        |> WebGL.triangles
-
-
-face : Vec3 -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> List ( Vertex, Vertex, Vertex )
-face color a b c d =
-    let
-        vertex position =
-            Vertex
-                (Vec3.scale (1 / 255) color)
-                position
-                (vec2 0 0)
-    in
-    [ ( vertex a, vertex b, vertex c )
-    , ( vertex c, vertex d, vertex a )
-    ]
 
 
 squareMesh : Mesh Vertex
@@ -713,21 +697,20 @@ squareMesh =
     let
         vertex position coord =
             { position = position
-            , color = vec3 110.5 110.5 110.5
             , coord = coord
             }
 
         topLeft =
-            vertex (vec3 -1 1 1) (vec2 0 1)
+            Vertex (vec3 -1 1 1) (vec2 0 1)
 
         topRight =
-            vertex (vec3 1 1 1) (vec2 1 1)
+            Vertex (vec3 1 1 1) (vec2 1 1)
 
         bottomLeft =
-            vertex (vec3 -1 -1 1) (vec2 0 0)
+            Vertex (vec3 -1 -1 1) (vec2 0 0)
 
         bottomRight =
-            vertex (vec3 1 -1 1) (vec2 1 0)
+            Vertex (vec3 1 -1 1) (vec2 1 0)
     in
     [ ( topLeft, topRight, bottomLeft )
     , ( bottomLeft, topRight, bottomRight )
