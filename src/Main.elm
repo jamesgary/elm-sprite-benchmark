@@ -110,7 +110,7 @@ init flags =
     in
     ( { sprites = newSprites
       , seed = newSeed
-      , renderer = WebGLRenderer
+      , renderer = HtmlTopLeft
       , hoveringRenderer = Nothing
       , texture = Nothing
       , resources = Game.Resources.init
@@ -119,8 +119,6 @@ init flags =
         [ "cat.png"
             |> WebGL.Texture.loadWith
                 { defaultOptions
-                  --| magnify = WebGL.Texture.nearest
-                  --, minify = WebGL.Texture.nearest
                     | magnify = WebGL.Texture.linear
                     , minify = WebGL.Texture.nearest
                 }
@@ -187,7 +185,7 @@ update msg model =
             ( { model
                 | sprites =
                     newSprites
-                        |> always model.sprites
+                        --|> always model.sprites
                         |> List.map
                             (\sprite ->
                                 let
@@ -364,41 +362,67 @@ view model =
                 , Html.Attributes.style "display" "flex"
                 , Html.Attributes.style "flex-direction" "column"
                 ]
-                (List.map
-                    (\( renderer, str ) ->
-                        Html.button
-                            ([ Html.Attributes.style "font-size" "16px"
-                             , Html.Attributes.style "margin" "0 0 5px"
-                             , Html.Attributes.style "padding" "5px 10px"
-                             , Html.Attributes.style "border-color" "#6cf #7bf #1af"
-                             , Html.Events.onMouseEnter (ButtonEnter renderer)
-                             , Html.Events.onMouseLeave ButtonLeave
-                             ]
-                                ++ (if model.renderer == renderer then
-                                        [ --Html.Attributes.disabled True -- can't listen to onMouseLeave
-                                          Html.Attributes.style "background" "#dff"
-                                        , Html.Attributes.style "color" "black"
-                                        ]
+                ([ ( "HTML"
+                   , [ ( HtmlTopLeft, "top / left" )
+                     , ( HtmlTransformTranslate, "transform: translate" )
+                     ]
+                   )
+                 , ( "WebGL"
+                   , [ ( WebGLRenderer, "WebGL" )
+                     , ( Zinggi, "Zinggi Game.TwoD" )
+                     ]
+                   )
+                 , ( "PixiJS"
+                   , [ ( PixiJsDataAttrs, "PixiJS with data attrs" )
+                     , ( PixiJsPorts, "PixiJS ports" )
+                     ]
+                   )
+                 , ( "Misc (non-rendering)"
+                   , [ ( DataAttrs, "Just data attrs" )
+                     , ( None, "None" )
+                     ]
+                   )
+                 ]
+                    |> List.map
+                        (\( title, buttons ) ->
+                            Html.div
+                                [ Html.Attributes.style "font-size" "16px"
+                                , Html.Attributes.style "margin" "1px 0 0"
+                                , Html.Attributes.style "font-weight" "bold"
+                                , Html.Attributes.style "text-decoration" "underline"
+                                , Html.Attributes.style "color" "#014"
+                                ]
+                                [ Html.text title ]
+                                :: (buttons
+                                        |> List.map
+                                            (\( renderer, str ) ->
+                                                Html.button
+                                                    ([ Html.Attributes.style "font-size" "16px"
+                                                     , Html.Attributes.style "margin" "0 0 5px"
+                                                     , Html.Attributes.style "padding" "5px 10px"
+                                                     , Html.Attributes.style "border-color" "#6cf #7bf #1af"
+                                                     , Html.Events.onMouseEnter (ButtonEnter renderer)
+                                                     , Html.Events.onMouseLeave ButtonLeave
+                                                     ]
+                                                        ++ (if model.renderer == renderer then
+                                                                [ --Html.Attributes.disabled True -- can't listen to onMouseLeave
+                                                                  Html.Attributes.style "background" "#dff"
+                                                                , Html.Attributes.style "color" "black"
+                                                                ]
 
-                                    else
-                                        [ Html.Events.onClick (ChangeRenderer renderer)
-                                        , Html.Attributes.style "background" "#adf"
-                                        , Html.Attributes.style "color" "black"
-                                        , Html.Attributes.style "cursor" "pointer"
-                                        ]
+                                                            else
+                                                                [ Html.Events.onClick (ChangeRenderer renderer)
+                                                                , Html.Attributes.style "background" "#adf"
+                                                                , Html.Attributes.style "color" "black"
+                                                                , Html.Attributes.style "cursor" "pointer"
+                                                                ]
+                                                           )
+                                                    )
+                                                    [ Html.text str ]
+                                            )
                                    )
-                            )
-                            [ Html.text str ]
-                    )
-                    [ ( HtmlTopLeft, "HTML: top, left" )
-                    , ( HtmlTransformTranslate, "HTML: transform" )
-                    , ( Zinggi, "Zinggi Game.TwoD" )
-                    , ( PixiJsDataAttrs, "PixiJS with data attrs" )
-                    , ( PixiJsPorts, "PixiJS ports" )
-                    , ( DataAttrs, "Just data attrs" )
-                    , ( None, "None" )
-                    , ( WebGLRenderer, "WebGL" )
-                    ]
+                        )
+                    |> List.concat
                 )
             , case model.hoveringRenderer of
                 Nothing ->
