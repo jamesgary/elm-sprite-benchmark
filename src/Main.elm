@@ -562,6 +562,17 @@ view model =
                 ]
                 [ Html.text "Lock to 100 sprites" ]
             ]
+        , Html.div
+            [ Html.Attributes.style "margin" "10px 0"
+            ]
+            [ Html.text "Source code at "
+            , Html.a
+                [ Html.Attributes.href "https://github.com/jamesgary/elm-sprite-benchmark"
+                , Html.Attributes.target "_blank"
+                ]
+                [ Html.text "github" ]
+            , Html.text "."
+            ]
         ]
 
 
