@@ -59,6 +59,7 @@ type alias Model =
     , seed : Random.Seed
     , renderer : Renderer
     , hoveringRenderer : Maybe Renderer
+    , spriteLimit : Maybe Int
 
     -- elm-explorations/webgl
     , texture : Maybe Texture
@@ -92,6 +93,8 @@ type Msg
     | ChangeRenderer Renderer
     | ButtonEnter Renderer
     | ButtonLeave
+    | CheckLockSpriteCount Bool
+      -- renderer specific msgs
     | TextureLoaded Texture
     | TextureError
     | Resources Game.Resources.Msg
@@ -112,6 +115,7 @@ init flags =
       , seed = newSeed
       , renderer = HtmlTopLeft
       , hoveringRenderer = Nothing
+      , spriteLimit = Nothing
       , texture = Nothing
       , resources = Game.Resources.init
       }
@@ -156,31 +160,48 @@ update msg model =
                         |> List.length
 
                 ( newSprites, newSeed ) =
-                    if delta > minTick then
-                        -- too slow! remove some sprites (down to 1 sprite)
-                        spritesLength
-                            |> toFloat
-                            |> (*) (2 * minTick)
-                            |> ceiling
-                            |> min (spritesLength - 1)
-                            |> (\decreaseAmt ->
-                                    ( List.drop decreaseAmt model.sprites, model.seed )
-                                --( List.take (List.length model.sprites - decreaseAmt) model.sprites, model.seed )
-                               )
+                    case model.spriteLimit of
+                        Just limit ->
+                            if spritesLength < limit then
+                                (limit - spritesLength)
+                                    |> (\increaseAmt ->
+                                            Random.step
+                                                (Random.list increaseAmt spriteGenerator)
+                                                model.seed
+                                                |> (\( generatedSprites, s ) -> ( generatedSprites ++ model.sprites, s ))
+                                       )
 
-                    else
-                        -- so fast, add more sprites!
-                        model.sprites
-                            |> List.length
-                            |> toFloat
-                            |> (*) 0.01
-                            |> round
-                            |> (\increaseAmt ->
-                                    Random.step
-                                        (Random.list increaseAmt spriteGenerator)
-                                        model.seed
-                                        |> (\( generatedSprites, s ) -> ( generatedSprites ++ model.sprites, s ))
-                               )
+                            else if spritesLength > limit then
+                                ( List.drop (spritesLength - limit) model.sprites, model.seed )
+
+                            else
+                                ( model.sprites, model.seed )
+
+                        Nothing ->
+                            if delta > minTick then
+                                -- too slow! remove some sprites (down to 1 sprite)
+                                spritesLength
+                                    |> toFloat
+                                    |> (*) (2 * minTick)
+                                    |> ceiling
+                                    |> min (spritesLength - 1)
+                                    |> (\decreaseAmt ->
+                                            ( List.drop decreaseAmt model.sprites, model.seed )
+                                        --( List.take (List.length model.sprites - decreaseAmt) model.sprites, model.seed )
+                                       )
+
+                            else
+                                -- so fast, add more sprites!
+                                spritesLength
+                                    |> toFloat
+                                    |> (*) 0.01
+                                    |> round
+                                    |> (\increaseAmt ->
+                                            Random.step
+                                                (Random.list increaseAmt spriteGenerator)
+                                                model.seed
+                                                |> (\( generatedSprites, s ) -> ( generatedSprites ++ model.sprites, s ))
+                                       )
             in
             ( { model
                 | sprites =
@@ -258,6 +279,18 @@ update msg model =
 
         ButtonLeave ->
             ( { model | hoveringRenderer = Nothing }, Cmd.none )
+
+        CheckLockSpriteCount isChecked ->
+            ( { model
+                | spriteLimit =
+                    if isChecked then
+                        Just 100
+
+                    else
+                        Nothing
+              }
+            , Cmd.none
+            )
 
         Resources resourcesMsg ->
             ( { model
@@ -500,7 +533,10 @@ view model =
                                 [ Html.text "This renders nothing! But it still calculates the positions of the sprites. It's just used as a max baseline." ]
 
                             WebGLRenderer ->
-                                [ Html.text "This is unfinished!" ]
+                                [ Html.text "This just uses "
+                                , code "elm-explorations/webgl"
+                                , Html.text ". It's fast, but can be difficult to get up and started. There may be a way to make this much faster with sprite batching, but I'm not sure if that's possible at the moment."
+                                ]
                         )
             ]
 
@@ -509,6 +545,23 @@ view model =
             [ Html.Attributes.style "margin" "10px 0"
             ]
             [ Html.text ("Total sprites: " ++ String.fromInt (List.length model.sprites)) ]
+        , Html.div
+            [ Html.Attributes.style "margin" "10px 0"
+            ]
+            [ Html.input
+                [ Html.Attributes.type_ "checkbox"
+                , Html.Attributes.style "top" "-2px"
+                , Html.Attributes.style "position" "relative"
+                , Html.Attributes.style "margin-right" "5px"
+                , Html.Attributes.id "lockSpriteCountCheckbox"
+                , Html.Events.onCheck CheckLockSpriteCount
+                ]
+                []
+            , Html.label
+                [ Html.Attributes.for "lockSpriteCountCheckbox"
+                ]
+                [ Html.text "Lock to 100 sprites" ]
+            ]
         ]
 
 
