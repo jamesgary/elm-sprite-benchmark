@@ -60,6 +60,7 @@ type alias Model =
     , renderer : Renderer
     , hoveringRenderer : Maybe Renderer
     , spriteLimit : Maybe Int
+    , targetFps : Int
 
     -- elm-explorations/webgl
     , texture : Maybe Texture
@@ -94,6 +95,7 @@ type Msg
     | ButtonEnter Renderer
     | ButtonLeave
     | CheckLockSpriteCount Bool
+    | ChangeTargetFps String
       -- renderer specific msgs
     | TextureLoaded Texture
     | TextureError
@@ -116,6 +118,7 @@ init flags =
       , renderer = HtmlTopLeft
       , hoveringRenderer = Nothing
       , spriteLimit = Nothing
+      , targetFps = 55
       , texture = Nothing
       , resources = Game.Resources.init
       }
@@ -153,7 +156,7 @@ update msg model =
                     5
 
                 minTick =
-                    1 / 55
+                    1 / toFloat model.targetFps
 
                 spritesLength =
                     model.sprites
@@ -195,7 +198,7 @@ update msg model =
                                 spritesLength
                                     |> toFloat
                                     |> (*) 0.01
-                                    |> round
+                                    |> ceiling
                                     |> (\increaseAmt ->
                                             Random.step
                                                 (Random.list increaseAmt spriteGenerator)
@@ -288,6 +291,15 @@ update msg model =
 
                     else
                         Nothing
+              }
+            , Cmd.none
+            )
+
+        ChangeTargetFps fpsStr ->
+            ( { model
+                | targetFps =
+                    String.toInt fpsStr
+                        |> Maybe.withDefault model.targetFps
               }
             , Cmd.none
             )
@@ -561,6 +573,23 @@ view model =
                 [ Html.Attributes.for "lockSpriteCountCheckbox"
                 ]
                 [ Html.text "Lock to 100 sprites" ]
+            ]
+        , Html.div
+            [ Html.Attributes.style "margin" "10px 0"
+            ]
+            [ Html.input
+                [ Html.Attributes.style "margin-right" "5px"
+                , Html.Attributes.style "width" "40px"
+                , Html.Attributes.id "targetFps"
+                , Html.Attributes.type_ "number"
+                , Html.Attributes.value (String.fromInt model.targetFps)
+                , Html.Events.onInput ChangeTargetFps
+                ]
+                []
+            , Html.label
+                [ Html.Attributes.for "targetFps"
+                ]
+                [ Html.text "Target FPS (55 is good for computer monitors, 25 for TVs)" ]
             ]
         , Html.div
             [ Html.Attributes.style "margin" "10px 0"
